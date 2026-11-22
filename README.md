@@ -17,7 +17,9 @@ EmDash ya resuelve una parte (sitemaps de colecciones, metadatos del `<head>`, v
 | Tarjeta del servidor MCP | `/.well-known/mcp/server-card.json` |
 | Índice de habilidades para agentes y su `SKILL.md` | `/.well-known/agent-skills/` |
 | Catálogo de recursos para agentes (ARD) | `/.well-known/ai-catalog.json` |
+| Agente A2A de solo lectura (busca y devuelve páginas; sin modelo detrás) y su tarjeta | `/a2a`, `/.well-known/agent-card.json` |
 | `auth.md` y declaración Personal Agent Protocol | `/auth.md`, `/.well-known/poppy.json` |
+| Registro anónimo y opcional de agentes (opción `registro`) | `POST /agent/auth` |
 | Constructores de datos estructurados (autoría, revisión experta, fuentes, migas, preguntas frecuentes) | `emdash-geo/schema` |
 
 Con ello el sitio pasa las pruebas de [isitagentready.com](https://isitagentready.com) (Cloudflare) que tienen sentido para una web de contenido.
@@ -99,9 +101,15 @@ const grafo = serializar([...nodosSitio(GEO), paginaRevisada(GEO, { url, titulo,
 - **`withGeo()`** responde a las rutas de la tabla y deja pasar el resto. El contenido lo obtiene llamando al propio sitio (el índice del plugin, la búsqueda de EmDash y las páginas HTML), siempre sin cookies ni credenciales: solo puede ver lo público.
 - El Markdown sale del mismo HTML que ve una persona: se toma `<main>`, se quitan navegación, formularios y scripts, y se antepone una cabecera con título, descripción, URL canónica y autoría.
 
+## Registro anónimo de agentes
+
+Con `registro: {}` el sitio acepta `POST /agent/auth` y emite una credencial firmada (HMAC, sin estado) que el agente puede enviar como `Authorization: Bearer` en `/mcp` y `/a2a`. Es voluntaria y no concede permisos: sirve para que un agente se identifique de forma estable. Una credencial manipulada o caducada recibe `401`. Necesita un secreto del Worker llamado `GEO_FIRMA` (un valor aleatorio largo, creado con `wrangler secret put GEO_FIRMA`).
+
+No implementa el perfil completo de auth.md (aserciones de identidad, ceremonia de reclamación): solo el alta anónima, y así lo dice el `auth.md` que se publica.
+
 ## Opciones
 
-Están documentadas en `src/core/config.ts` (`OpcionesGeo`). Las principales: `sitio`, `autor`, `colecciones`, `paginas`, `secciones`, `senales`, `aviso`, `robots`, `mcp` (`false` lo desactiva), `editorial` y `prefijoApi`.
+Están documentadas en `src/core/config.ts` (`OpcionesGeo`). Las principales: `sitio`, `autor`, `colecciones`, `paginas`, `secciones`, `senales`, `aviso`, `robots`, `mcp` y `a2a` (`false` los desactiva), `registro`, `editorial` y `prefijoApi`.
 
 Los textos que genera el plugin (llms.txt, auth.md, descripciones de herramientas) están en español.
 

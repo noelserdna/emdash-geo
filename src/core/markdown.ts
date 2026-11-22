@@ -80,7 +80,7 @@ const EXTENSION = /\.[a-z0-9]{2,5}$/i;
 
 /** Páginas públicas de la web (no el panel, ni la API, ni ficheros). */
 export function esPagina(ruta: string, prefijoApi = "/api"): boolean {
-  if (ruta.startsWith("/_") || ruta.startsWith("/.well-known/") || ruta === "/mcp") return false;
+  if (ruta.startsWith("/_") || ruta.startsWith("/.well-known/") || ruta === "/mcp" || ruta === "/a2a" || ruta.startsWith("/agent/")) return false;
   if (ruta === prefijoApi || ruta.startsWith(`${prefijoApi}/`)) return false;
   return !EXTENSION.test(ruta);
 }

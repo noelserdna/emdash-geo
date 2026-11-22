@@ -87,6 +87,14 @@ export interface OpcionesGeo {
    * alias raíz de sus metadatos. Por defecto, sí.
    */
   editorial?: boolean;
+  /** Agente A2A de solo lectura en /a2a y su tarjeta. `false` lo desactiva. */
+  a2a?: false;
+  /**
+   * Registro anónimo y opcional de agentes (auth.md): `POST /agent/auth` emite
+   * una credencial firmada para identificarse en /mcp y /a2a. No da permisos
+   * extra. Necesita un secreto del Worker (por defecto `GEO_FIRMA`).
+   */
+  registro?: { secretEnv?: string; dias?: number };
   /** Prefijo de los listados JSON y del OpenAPI (por defecto «/api»). */
   prefijoApi?: string;
 }

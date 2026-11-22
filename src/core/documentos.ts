@@ -301,6 +301,18 @@ export function catalogoIa(o: OpcionesGeo, indice: Indice) {
             },
           ]
         : []),
+      ...(o.a2a !== false
+        ? [
+            {
+              identifier: urn("agent", "lectura"),
+              displayName: `Agente A2A de lectura: ${o.sitio.nombre}`,
+              description: "Agente de solo lectura: busca en el contenido y devuelve páginas en Markdown.",
+              type: "application/a2a-agent-card+json",
+              url: `${origen}/.well-known/agent-card.json`,
+              representativeQueries: preguntas,
+            },
+          ]
+        : []),
       {
         identifier: urn("api", "contenido"),
         displayName: "API de lectura del contenido",
@@ -474,6 +486,24 @@ La gestión del contenido se hace por el servidor MCP del gestor, \`${origen}/_e
 
 Ese acceso exige que una persona del equipo editorial inicie sesión y apruebe los permisos. No se conceden cuentas a agentes de terceros ni hay alta automática.
 `;
+  const dias = o.registro?.dias ?? 90;
+  const registro = o.registro
+    ? `
+## Registro anónimo de agentes (opcional)
+
+Para agentes de IA y clientes automáticos que quieran identificarse de forma estable. No es obligatorio y no concede permisos adicionales: el contenido se lee igual con credencial o sin ella.
+
+- Audiencia: agentes de IA y clientes MCP o A2A que consultan esta web.
+- Punto de registro (\`register_uri\`): \`POST ${origen}/agent/auth\`
+- Método admitido: \`anonymous\` (sin cuenta, sin correo y sin intervención humana).
+- Petición: JSON \`{"type": "anonymous", "name": "<nombre del agente>", "contact": "<URL o correo, opcional>"}\`.
+- Respuesta \`201\`: \`{"agent_id", "credential_type": "bearer", "token", "expires_at"}\`.
+- Uso de la credencial: envíala como \`Authorization: Bearer <token>\` en \`${origen}/mcp\`${o.a2a !== false ? ` y \`${origen}/a2a\`` : ""}. Una credencial caducada o manipulada recibe \`401\`; sin credencial, el acceso es el mismo.
+- Comprobación: \`GET ${origen}/agent/auth\` con la credencial devuelve la identidad registrada.
+- Caducidad: ${dias} días. No hay renovación ni ceremonia de reclamación: registra de nuevo cuando caduque.
+- El nombre y el contacto son declarados por el agente y no se verifican.
+`
+    : "";
   return `# auth.md — ${dominio}
 
 Guía para agentes de IA sobre el acceso a ${origen}.
@@ -484,10 +514,10 @@ Todo lo que publica esta web se lee sin registro, sin clave y sin token:
 
 - Páginas en HTML o en Markdown (añade \`.md\` a la URL o envía \`Accept: text/markdown\`).
 - Índice: \`${origen}/llms.txt\`.
-- Búsqueda y listados en JSON: descritos en \`${origen}${prefijoApi(o)}/openapi.json\`.${mcpActivo(o) ? `\n- Servidor MCP de solo lectura: \`${origen}/mcp\`.` : ""}
+- Búsqueda y listados en JSON: descritos en \`${origen}${prefijoApi(o)}/openapi.json\`.${mcpActivo(o) ? `\n- Servidor MCP de solo lectura: \`${origen}/mcp\`.` : ""}${o.a2a !== false ? `\n- Agente A2A de solo lectura: \`${origen}/a2a\` (tarjeta en \`${origen}/.well-known/agent-card.json\`).` : ""}
 
-No existe registro de agentes para el contenido público porque no hace falta: no hay nada que reclamar ni credencial que emitir. Usa un \`User-Agent\` que te identifique y respeta \`${origen}/robots.txt\`.
-${editorial}`;
+${o.registro ? "El registro es opcional" : "No existe registro de agentes para el contenido público porque no hace falta: no hay nada que reclamar ni credencial que emitir"}. Usa un \`User-Agent\` que te identifique y respeta \`${origen}/robots.txt\`.
+${registro}${editorial}`;
 }
 
 /** Personal Agent Protocol: declaración de solo web, sin sesiones ni API con cuenta. */

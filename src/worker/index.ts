@@ -33,7 +33,9 @@ import {
   TIPO_OPENAPI,
 } from "../core/documentos.ts";
 import { esPagina, htmlAMarkdown } from "../core/markdown.ts";
-import { atenderMcp, type FuentesMcp } from "../core/mcp.ts";
+import { atenderMcp, CORS, type FuentesMcp } from "../core/mcp.ts";
+import { a2aActivo, atenderA2a, RUTA_A2A, tarjetaA2a } from "../core/a2a.ts";
+import { emitirCredencial, portador, verificarCredencial } from "../core/registro.ts";
 
 export interface ManejadorFetch<Env = unknown> {
   fetch?: (request: Request, env: Env, ctx: any) => Response | Promise<Response>;
@@ -110,8 +112,52 @@ export function withGeo<Env = unknown>(
         return htmlAMarkdown(await r.text(), opciones, rutaPagina).markdown;
       };
 
-      // ── Servidor MCP público ──
-      if (ruta === "/mcp" && opciones.mcp !== false) {
+      // ── Registro anónimo de agentes (opcional) ──
+      const secreto = opciones.registro
+        ? (env as Record<string, unknown> | undefined)?.[opciones.registro.secretEnv ?? "GEO_FIRMA"]
+        : undefined;
+      const firma = typeof secreto === "string" && secreto.length > 0 ? secreto : null;
+      if (ruta === "/agent/auth" && opciones.registro) {
+        if (metodo === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+        const sinCache = { ...CORS, "Cache-Control": "no-store" };
+        if (!firma) return Response.json({ error: "registro_no_disponible" }, { status: 503, headers: sinCache });
+        if (metodo === "POST") {
+          const cuerpo = (await request.json().catch(() => ({}))) as { type?: unknown; name?: unknown; contact?: unknown };
+          if (cuerpo.type !== undefined && cuerpo.type !== "anonymous") {
+            return Response.json({ error: "tipo_no_admitido", admitidos: ["anonymous"] }, { status: 400, headers: sinCache });
+          }
+          const { token, identidad } = await emitirCredencial(firma, { nombre: cuerpo.name, contacto: cuerpo.contact }, ahora(), opciones.registro.dias);
+          return Response.json(
+            {
+              agent_id: identidad.id,
+              name: identidad.nombre,
+              credential_type: "bearer",
+              token,
+              expires_at: new Date(identidad.exp * 1000).toISOString(),
+              usage: `Authorization: Bearer <token> en ${origen}/mcp${a2aActivo(opciones) ? ` y ${origen}${RUTA_A2A}` : ""}. Opcional: no concede permisos adicionales.`,
+            },
+            { status: 201, headers: sinCache },
+          );
+        }
+        const token = portador(request);
+        const identidad = token ? await verificarCredencial(firma, token, ahora()) : null;
+        return identidad
+          ? Response.json({ agent_id: identidad.id, name: identidad.nombre, contact: identidad.contacto, expires_at: new Date(identidad.exp * 1000).toISOString() }, { headers: sinCache })
+          : Response.json({ error: "credencial_no_valida", registro: `POST ${origen}/agent/auth` }, { status: 401, headers: { ...sinCache, "WWW-Authenticate": "Bearer" } });
+      }
+
+      // ── Servidor MCP público y agente A2A ──
+      const esMcp = ruta === "/mcp" && opciones.mcp !== false;
+      const esA2a = ruta === RUTA_A2A && a2aActivo(opciones);
+      if (esMcp || esA2a) {
+        // La credencial es opcional; si se envía una del registro, tiene que ser válida.
+        const token = opciones.registro && firma ? portador(request) : null;
+        if (token && firma && !(await verificarCredencial(firma, token, ahora()))) {
+          return Response.json(
+            { error: "credencial_no_valida", detalle: `Regístrate de nuevo en POST ${origen}/agent/auth o consulta sin credencial.` },
+            { status: 401, headers: { ...CORS, "WWW-Authenticate": 'Bearer error="invalid_token"' } },
+          );
+        }
         const fuentes: FuentesMcp = {
           leer,
           listar: async (clave) => (await indice()).colecciones[clave] ?? [],
@@ -137,7 +183,7 @@ export function withGeo<Env = unknown>(
             });
           },
         };
-        return atenderMcp(request, opciones, fuentes);
+        return esMcp ? atenderMcp(request, opciones, fuentes) : atenderA2a(request, opciones, fuentes);
       }
 
       if (metodo !== "GET" && metodo !== "HEAD") return base.call(manejador, request, env, ctx);
@@ -170,6 +216,10 @@ export function withGeo<Env = unknown>(
         case "/.well-known/mcp.json":
           if (opciones.mcp === false) break;
           return responder(json(tarjetaMcp(opciones)));
+        case "/.well-known/agent-card.json":
+        case "/.well-known/agent.json":
+          if (!a2aActivo(opciones)) break;
+          return responder(json(tarjetaA2a(opciones)));
         case "/.well-known/agent-skills/index.json":
           return responder(json(await indiceHabilidades(opciones)));
         case "/.well-known/ai-catalog.json":

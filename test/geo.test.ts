@@ -188,3 +188,45 @@ test("datos estructurados: autoría, revisión y escape de «<»", () => {
   assert.equal(pagina.reviewedBy["@id"], "https://ejemplo.test/#autor");
   assert.ok(!serializar([{ a: "</script>" }]).includes("</script>"));
 });
+
+test("agente A2A: tarjeta, búsqueda y lectura", async () => {
+  const tarjeta = (await (await pedir("/.well-known/agent-card.json")).json()) as any;
+  assert.equal(tarjeta.url, "https://ejemplo.test/a2a");
+  assert.deepEqual(tarjeta.skills.map((s: { id: string }) => s.id), ["buscar", "leer"]);
+  const a2a = async (texto: string, method = "message/send") =>
+    (await (await pedir("/a2a", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: { message: { role: "user", kind: "message", messageId: "m1", parts: [{ kind: "text", text: texto }] } } }),
+    })).json()) as any;
+  const busqueda = await a2a("tomates");
+  assert.equal(busqueda.result.role, "agent");
+  assert.match(busqueda.result.parts[0].text, /Cómo plantar tomates — https:\/\/ejemplo\.test\/articulos\/tomates/);
+  assert.equal(busqueda.result.parts[1].data.resultados.length, 1);
+  const lectura = await a2a("lee https://ejemplo.test/articulos/tomates");
+  assert.match(lectura.result.parts[0].text, /# Cómo plantar tomates/);
+  assert.equal((await a2a("x", "tasks/get")).error.code, -32001);
+  assert.equal((await a2a("x", "otra/cosa")).error.code, -32601);
+});
+
+test("registro anónimo: emite una credencial que /mcp acepta y rechaza si se manipula", async () => {
+  const conRegistro = withGeo(sitio, { ...opciones, registro: {} });
+  const env = { GEO_FIRMA: "secreto-de-prueba" };
+  const llamar = (ruta: string, init?: RequestInit, e: unknown = env) => conRegistro.fetch(new Request(`https://ejemplo.test${ruta}`, init), e, undefined);
+  const alta = await llamar("/agent/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "anonymous", name: "Probador" }) });
+  assert.equal(alta.status, 201);
+  const { token, agent_id } = (await alta.json()) as { token: string; agent_id: string };
+  const quien = await llamar("/agent/auth", { headers: { authorization: `Bearer ${token}` } });
+  assert.equal(((await quien.json()) as { agent_id: string }).agent_id, agent_id);
+
+  const cuerpo = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" });
+  const mcp = (cabeceras: Record<string, string>) => llamar("/mcp", { method: "POST", headers: { "content-type": "application/json", ...cabeceras }, body: cuerpo });
+  assert.equal((await mcp({ authorization: `Bearer ${token}` })).status, 200);
+  assert.equal((await mcp({})).status, 200);
+  assert.equal((await mcp({ authorization: `Bearer ${token.slice(0, -2)}xx` })).status, 401);
+
+  assert.equal((await llamar("/agent/auth", { method: "POST", body: "{}" }, {})).status, 503);
+  assert.equal((await llamar("/agent/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "service_auth" }) })).status, 400);
+  // Sin la opción, la ruta no existe para el plugin.
+  assert.equal((await pedir("/agent/auth")).status, 404);
+});
