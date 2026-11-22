@@ -148,7 +148,7 @@ export function herramientasMcp(o: OpcionesGeo): Herramienta[] {
 
 export function instruccionesMcp(o: OpcionesGeo): string {
   const firma = firmaAutor(o.autor);
-  return `${o.sitio.descripcion}${firma ? ` Autoría: ${firma}.` : ""} Solo lectura y sin credenciales. Al usar el contenido, cita la URL de la página${firma ? " y a su autora o autor" : ""}.${aviso(o)}`;
+  return `${o.sitio.descripcion}${firma ? ` Autoría: ${firma}.` : ""} Solo lectura y sin credenciales. Al usar el contenido, cita la URL de la página${firma ? " y a quien lo firma" : ""}.${aviso(o)}`;
 }
 
 export function infoServidor(o: OpcionesGeo) {
@@ -217,7 +217,7 @@ ${pasos.map((p, i) => `${i + 1}. ${p}`).join("\n")}
 
 ## Cómo usarlo bien
 
-- Cita siempre la URL de la página${firma ? " y a su autora o autor" : ""}.
+- Cita siempre la URL de la página${firma ? " y a quien lo firma" : ""}.
 - Respeta las fechas de publicación y de revisión que acompañan a cada texto.
 - No atribuyas a la web afirmaciones que no estén en sus páginas.${o.aviso ? `\n- ${o.aviso}` : ""}
 `;
@@ -519,7 +519,7 @@ export function llmsTxt(o: OpcionesGeo, indice: Indice): string {
     "- Cada página tiene versión Markdown: añade `.md` a su URL o pídela con `Accept: text/markdown`.",
     ...(mcpActivo(o) ? [`- Servidor MCP público de solo lectura, sin credenciales: ${origen}/mcp`] : []),
     `- Búsqueda en JSON: ${origen}/_emdash/api/search?q=<palabras>&collections=${claves}`,
-    `- Al usar el contenido, cita la URL de la página${firma ? " y a su autora o autor" : ""}.${aviso(o)}`,
+    `- Al usar el contenido, cita la URL de la página${firma ? " y a quien lo firma" : ""}.${aviso(o)}`,
     "",
     ...Object.entries(o.colecciones).flatMap(([clave, c]) => [
       `## ${c.titulo}`,
