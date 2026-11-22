@@ -1,0 +1,69 @@
+{
+  "name": "emdash-geo",
+  "version": "0.1.0",
+  "description": "Plugin de EmDash CMS para SEO y GEO: hace el sitio legible para buscadores y agentes de IA (Markdown por negociación de contenido, llms.txt, robots.txt con Content Signals, cabeceras Link, catálogo de API, servidor MCP público de solo lectura, habilidades, catálogo ARD y datos estructurados).",
+  "type": "module",
+  "license": "MIT",
+  "author": "Andrés León",
+  "keywords": [
+    "emdash",
+    "emdash-plugin",
+    "seo",
+    "geo",
+    "llms-txt",
+    "mcp",
+    "agent-ready",
+    "markdown"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "default": "./dist/plugin.js"
+    },
+    "./worker": {
+      "types": "./dist/worker/index.d.ts",
+      "default": "./dist/worker/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "default": "./dist/schema.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "node-html-markdown": "2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "emdash": "1.4.0",
+    "typescript": "^5.9.0"
+  },
+  "peerDependencies": {
+    "emdash": ">=1.4.0"
+  },
+  "peerDependenciesMeta": {
+    "emdash": {
+      "optional": true
+    }
+  }
+}
