@@ -10,7 +10,9 @@ import { origenDe, type OpcionesGeo } from "./core/config.ts";
 export type Nodo = Record<string, unknown>;
 
 export const idAutor = (origen: string) => `${origen}/#autor`;
-export const idSitio = (origen: string) => `${origen}/#sitio`;
+// Mismo @id que el WebSite que emite EmDash (desde 1.5.0), para que los dos
+// nodos se fundan en uno en vez de publicar dos sitios web distintos.
+export const idSitio = (origen: string) => `${origen}/#website`;
 
 function iso(valor: Date | string | null | undefined): string | undefined {
   if (!valor) return undefined;

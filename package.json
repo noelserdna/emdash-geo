@@ -5,6 +5,14 @@
   "type": "module",
   "license": "MIT",
   "author": "Andrés León",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noelserdna/emdash-geo.git"
+  },
+  "homepage": "https://github.com/noelserdna/emdash-geo#readme",
+  "bugs": {
+    "url": "https://github.com/noelserdna/emdash-geo/issues"
+  },
   "keywords": [
     "emdash",
     "emdash-plugin",
@@ -55,7 +63,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "emdash": "1.4.0",
+    "emdash": "1.6.0",
     "typescript": "^5.9.0"
   },
   "peerDependencies": {
