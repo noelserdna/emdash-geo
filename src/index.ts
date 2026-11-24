@@ -2,7 +2,7 @@
 // envoltorio del Worker. Ambos reciben las mismas opciones.
 import type { PluginDescriptor } from "emdash";
 import { ID_PLUGIN, VERSION, type OpcionesGeo } from "./core/config.ts";
-import { esquemaAjustes } from "./plugin.ts";
+import { esquemaAjustes, permisos } from "./plugin.ts";
 
 export type { AutorGeo, ColeccionGeo, OpcionesGeo, PaginaGeo, SenalesGeo } from "./core/config.ts";
 export { withGeo, type ManejadorEnvuelto, type ManejadorFetch, type OpcionesWorkerGeo } from "./worker/index.ts";
@@ -15,7 +15,7 @@ export function geo(opciones: OpcionesGeo): PluginDescriptor<OpcionesGeo> {
     entrypoint: "emdash-geo/plugin",
     format: "native",
     options: opciones,
-    capabilities: ["content:read"],
+    ...permisos(opciones),
     settingsSchema: esquemaAjustes(opciones),
   };
 }

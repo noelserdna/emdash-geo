@@ -1,7 +1,7 @@
 // Punto de entrada que carga EmDash (formato native): `createPlugin(opciones)`.
 // El plugin aporta el índice público de contenido que consume el envoltorio
 // del Worker y los ajustes de uso del contenido editables desde el panel.
-import { definePlugin, type PluginRoute, type ResolvedPlugin, type RouteContext } from "emdash";
+import { definePlugin, type PluginCapability, type PluginRoute, type ResolvedPlugin, type RouteContext } from "emdash";
 import {
   ID_PLUGIN,
   origenDe,
@@ -14,8 +14,16 @@ import {
   type OpcionesGeo,
   type Senales,
 } from "./core/config.ts";
+import { ganchosIndexNow, HOST_INDEXNOW } from "./core/indexnow.ts";
 
 export { ID_PLUGIN, VERSION };
+
+/** Capacidades y hosts que pide el plugin según sus opciones (las usan el descriptor y `createPlugin`). */
+export function permisos(opciones: OpcionesGeo): { capabilities: string[]; allowedHosts: string[] } {
+  return opciones.indexnow
+    ? { capabilities: ["content:read", "network:request"], allowedHosts: [HOST_INDEXNOW] }
+    : { capabilities: ["content:read"], allowedHosts: [] };
+}
 
 export function esquemaAjustes(opciones: OpcionesGeo) {
   const s = senalesDe(opciones);
@@ -114,10 +122,15 @@ export function createPlugin(opciones: OpcionesGeo): ResolvedPlugin {
       },
     },
   };
+  // IndexNow: avisa al publicar, despublicar o borrar (solo si está configurado).
+  const ganchos = ganchosIndexNow(opciones);
+  const { capabilities, allowedHosts } = permisos(opciones);
   return definePlugin({
     id: ID_PLUGIN,
     version: VERSION,
-    capabilities: ["content:read"],
+    capabilities: capabilities as PluginCapability[],
+    ...(allowedHosts.length ? { allowedHosts } : {}),
+    ...(ganchos ? { hooks: ganchos } : {}),
     routes: rutas,
     admin: { settingsSchema: esquemaAjustes(opciones) },
   });

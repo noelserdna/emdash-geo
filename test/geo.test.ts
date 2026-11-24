@@ -230,3 +230,85 @@ test("registro anónimo: emite una credencial que /mcp acepta y rechaza si se ma
   // Sin la opción, la ruta no existe para el plugin.
   assert.equal((await pedir("/agent/auth")).status, 404);
 });
+
+// ── IndexNow ──
+import { claveIndexNow, cuerpoIndexNow, ganchosIndexNow, API_INDEXNOW } from "../src/core/indexnow.ts";
+
+const CLAVE = "0123456789abcdef0123456789abcdef";
+const conIndexNow: OpcionesGeo = { ...opciones, indexnow: { clave: CLAVE } };
+
+test("IndexNow: valida la clave y arma el cuerpo del aviso", () => {
+  assert.equal(claveIndexNow(opciones), null);
+  assert.equal(claveIndexNow(conIndexNow), CLAVE);
+  for (const mala of ["corta", "con espacio 123", "a".repeat(129), "punto.no.vale"]) {
+    assert.throws(() => claveIndexNow({ ...opciones, indexnow: { clave: mala } }), /indexnow\.clave/);
+  }
+  assert.throws(() => withGeo(sitio, { ...opciones, indexnow: { clave: "x" } }), /indexnow\.clave/);
+  assert.deepEqual(cuerpoIndexNow(conIndexNow, CLAVE, ["https://ejemplo.test/articulos/tomates"]), {
+    host: "ejemplo.test",
+    key: CLAVE,
+    keyLocation: `https://ejemplo.test/${CLAVE}.txt`,
+    urlList: ["https://ejemplo.test/articulos/tomates"],
+  });
+});
+
+test("IndexNow: el Worker sirve /<clave>.txt solo si está configurado", async () => {
+  const conClave = withGeo(sitio, conIndexNow);
+  const r = await conClave.fetch(new Request(`https://ejemplo.test/${CLAVE}.txt`), undefined, undefined);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal(await r.text(), CLAVE);
+  const cabeza = await conClave.fetch(new Request(`https://ejemplo.test/${CLAVE}.txt`, { method: "HEAD" }), undefined, undefined);
+  assert.equal(cabeza.status, 200);
+  assert.equal(await cabeza.text(), "");
+  // Otra clave o sin la opción: pasa a EmDash.
+  assert.equal((await conClave.fetch(new Request("https://ejemplo.test/otraclave123.txt"), undefined, undefined)).status, 404);
+  assert.equal((await pedir(`/${CLAVE}.txt`)).status, 404);
+});
+
+test("IndexNow: los ganchos avisan al publicar, despublicar y borrar", async () => {
+  assert.equal(ganchosIndexNow(opciones), null);
+  const ganchos = ganchosIndexNow(conIndexNow)!;
+  assert.equal(ganchos["content:afterPublish"].errorPolicy, "continue");
+  const enviados: { url: string; cuerpo: any }[] = [];
+  const avisos: string[] = [];
+  const ctx = {
+    http: {
+      fetch: async (url: string, init?: RequestInit) => {
+        enviados.push({ url, cuerpo: JSON.parse(String(init?.body)) });
+        return new Response(null, { status: 202 });
+      },
+    },
+    content: {
+      get: async (_c: string, id: string) => (id === "1" ? { slug: "tomates", status: "published" } : { slug: "borrador", status: "draft" }),
+    },
+    log: { info: (m: string) => avisos.push(m), warn: (m: string) => avisos.push(m) },
+  };
+
+  await ganchos["content:afterPublish"].handler({ content: { id: "1", slug: "tomates" }, collection: "posts" }, ctx);
+  assert.equal(enviados.length, 1);
+  assert.equal(enviados[0]!.url, API_INDEXNOW);
+  assert.deepEqual(enviados[0]!.cuerpo.urlList, ["https://ejemplo.test/articulos/tomates"]);
+  assert.equal(enviados[0]!.cuerpo.keyLocation, `https://ejemplo.test/${CLAVE}.txt`);
+
+  await ganchos["content:afterUnpublish"].handler({ content: { slug: "lechuga" }, collection: "fichas" }, ctx);
+  assert.deepEqual(enviados[1]!.cuerpo.urlList, ["https://ejemplo.test/plantas/lechuga"]);
+
+  // Colecciones no configuradas o sin slug: nada.
+  await ganchos["content:afterPublish"].handler({ content: { slug: "x" }, collection: "paginas" }, ctx);
+  await ganchos["content:afterPublish"].handler({ content: { slug: null }, collection: "posts" }, ctx);
+  assert.equal(enviados.length, 2);
+
+  // Borrar: la URL se toma antes (solo si estaba publicada) y se avisa después.
+  assert.equal(await ganchos["content:beforeDelete"].handler({ id: "1", collection: "posts" }, ctx), undefined);
+  await ganchos["content:afterDelete"].handler({ id: "1", collection: "posts", permanent: false }, ctx);
+  assert.deepEqual(enviados[2]!.cuerpo.urlList, ["https://ejemplo.test/articulos/tomates"]);
+  await ganchos["content:beforeDelete"].handler({ id: "2", collection: "posts" }, ctx);
+  await ganchos["content:afterDelete"].handler({ id: "2", collection: "posts", permanent: false }, ctx);
+  assert.equal(enviados.length, 3);
+
+  // Si la red falla, no lanza: solo lo anota.
+  const roto = { ...ctx, http: { fetch: async () => { throw new Error("sin red"); } } };
+  await ganchos["content:afterPublish"].handler({ content: { slug: "tomates" }, collection: "posts" }, roto);
+  assert.match(avisos.at(-1)!, /sin respuesta/);
+});

@@ -20,6 +20,7 @@ EmDash ya resuelve una parte (sitemaps de colecciones, metadatos del `<head>`, v
 | Agente A2A de solo lectura (busca y devuelve páginas; sin modelo detrás) y su tarjeta | `/a2a`, `/.well-known/agent-card.json` |
 | `auth.md` y declaración Personal Agent Protocol | `/auth.md`, `/.well-known/poppy.json` |
 | Registro anónimo y opcional de agentes (opción `registro`) | `POST /agent/auth` |
+| Fichero de la clave de IndexNow y avisos al publicar (opción `indexnow`) | `/<clave>.txt` |
 | Constructores de datos estructurados (autoría, revisión experta, fuentes, migas, preguntas frecuentes) | `emdash-geo/schema` |
 
 Con ello el sitio pasa las pruebas de [isitagentready.com](https://isitagentready.com) (Cloudflare) que tienen sentido para una web de contenido.
@@ -107,9 +108,13 @@ Con `registro: {}` el sitio acepta `POST /agent/auth` y emite una credencial fir
 
 No implementa el perfil completo de auth.md (aserciones de identidad, ceremonia de reclamación): solo el alta anónima, y así lo dice el `auth.md` que se publica.
 
+## IndexNow
+
+Con `indexnow: { clave: "…" }` (8-128 caracteres de `[a-zA-Z0-9-]`; por ejemplo, 32 hexadecimales aleatorios) el Worker sirve `/<clave>.txt` con la clave y el plugin avisa a `https://api.indexnow.org/indexnow` cada vez que se publica, despublica o borra una entrada de las colecciones configuradas (ganchos `content:afterPublish`, `content:afterUnpublish`, `content:beforeDelete` + `content:afterDelete`). La clave es pública por diseño del protocolo: va en las opciones, no en un secreto. Pide la capacidad `network:request` solo hacia `api.indexnow.org`. Los avisos no bloquean nunca la edición: un fallo de red solo queda en el log.
+
 ## Opciones
 
-Están documentadas en `src/core/config.ts` (`OpcionesGeo`). Las principales: `sitio`, `autor`, `colecciones`, `paginas`, `secciones`, `senales`, `aviso`, `robots`, `mcp` y `a2a` (`false` los desactiva), `registro`, `editorial` y `prefijoApi`.
+Están documentadas en `src/core/config.ts` (`OpcionesGeo`). Las principales: `sitio`, `autor`, `colecciones`, `paginas`, `secciones`, `senales`, `aviso`, `robots`, `mcp` y `a2a` (`false` los desactiva), `registro`, `indexnow`, `editorial` y `prefijoApi`.
 
 Los textos que genera el plugin (llms.txt, auth.md, descripciones de herramientas) están en español.
 

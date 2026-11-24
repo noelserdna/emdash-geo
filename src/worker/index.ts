@@ -36,6 +36,7 @@ import { esPagina, htmlAMarkdown } from "../core/markdown.ts";
 import { atenderMcp, CORS, type FuentesMcp } from "../core/mcp.ts";
 import { a2aActivo, atenderA2a, RUTA_A2A, tarjetaA2a } from "../core/a2a.ts";
 import { emitirCredencial, portador, verificarCredencial } from "../core/registro.ts";
+import { claveIndexNow, rutaClaveIndexNow } from "../core/indexnow.ts";
 
 export interface ManejadorFetch<Env = unknown> {
   fetch?: (request: Request, env: Env, ctx: any) => Response | Promise<Response>;
@@ -75,6 +76,9 @@ export function withGeo<Env = unknown>(
   const origen = origenDe(opciones);
   const api = prefijoApi(opciones);
   const ahora = ajustes.ahora ?? (() => Date.now());
+  // Se valida al montar: una clave mal escrita debe fallar al desplegar, no en silencio.
+  const claveIndex = claveIndexNow(opciones);
+  const rutaClave = claveIndex ? rutaClaveIndexNow(claveIndex) : null;
   const vidaIndice = (ajustes.cacheIndice ?? 60) * 1000;
   let cache: { hasta: number; indice: Indice } | null = null;
 
@@ -188,6 +192,15 @@ export function withGeo<Env = unknown>(
 
       if (metodo !== "GET" && metodo !== "HEAD") return base.call(manejador, request, env, ctx);
       const responder = (r: Response) => (metodo === "HEAD" ? sinCuerpo(r) : r);
+
+      // ── Fichero de la clave de IndexNow ──
+      if (rutaClave && ruta === rutaClave) {
+        return responder(
+          new Response(claveIndex, {
+            headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600" },
+          }),
+        );
+      }
 
       // ── Documentos de descubrimiento ──
       switch (ruta) {

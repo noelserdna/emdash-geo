@@ -97,6 +97,12 @@ export interface OpcionesGeo {
   registro?: { secretEnv?: string; dias?: number };
   /** Prefijo de los listados JSON y del OpenAPI (por defecto «/api»). */
   prefijoApi?: string;
+  /**
+   * IndexNow: avisa a los buscadores al publicar, despublicar o borrar una
+   * entrada de las colecciones configuradas, y sirve /<clave>.txt. La clave
+   * es pública por diseño (8-128 caracteres de [a-zA-Z0-9-]).
+   */
+  indexnow?: { clave: string };
 }
 
 export const ID_PLUGIN = "geo";
